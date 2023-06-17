@@ -1,78 +1,22 @@
-from flask import Flask, jsonify, request
-from datetime import datetime
-from youtube_transcript_api import YouTubeTranscriptApi
 from transformers import pipeline
-from urllib.parse import urlparse, parse_qs
-from flask_cors import CORS, cross_origin
-
-
-# define a variable to hold your app
+from flask import Flask
 app = Flask(__name__)
-CORS(app)
 
-# define your resource endpoints
+text_example = '''The tower is 324 meters (1,063 ft) tall, about the same height 
+as an 81-storey building, and the tallest structure in Paris. Its base is square, 
+measuring 125 meters (410 ft) on each side. During its construction, the Eiffel 
+Tower surpassed the Washington Monument to become the tallest man-made structure 
+in the world, a title it held for 41 years until the Chrysler Building in New York
+City was finished in 1930. It was the first structure to reach a height of 300 meters. 
+Due to the addition of a broadcasting aerial at the top of the tower in 1957, it is 
+now taller than the Chrysler Building by 5.2 meters (17 ft). Excluding transmitters, 
+the Eiffel Tower is the second tallest free-standing structure in France
+after the Millau Viaduct.'''
+
 @app.route('/')
-def index_page():
-    return "Hello world"
+def summarise_text_eg():
+    summarizer = pipeline("summarization", model = "facebook/bart-large-cnn")
+    return summarizer(text_example)
 
-@app.route('/api/summarize', methods=['GET'])
-@cross_origin(origin='*')
-def extr_yturl():
-    args = request.args
-    
-    args = args.to_dict()
-    print(args)
-    url = str(args['youtube_url'])
-    print(url)
-    variable = transc(get_vid(url))
-    return transcript_summary(variable)
-
-# http://[hostname]/api/summarize?youtube_url=<url>
-# https://www.youtube.com/watch?v=8EPJiFfWRfw
-
-def transc(video_id):
-    transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['en-US', 'en'])
-    strr = ""
-    for t in transcript :
-        strr = strr + t["text"] + " "
-    
-    return(strr)
-
-def transcript_summary(transcript):
-    summarizer = pipeline("summarization", model="t5-base", tokenizer="t5-base", framework="pt")
-
-    num_iters = int(len(transcript)/1000)
-    summarized_text = []
-    summ_t = ""
-    for i in range(0, num_iters + 1):
-        start = 0
-        start = i * 1000
-        end = (i + 1) * 1000
-        out = summarizer(transcript[start:end])
-        out = out[0]
-        out = out['summary_text']
-        summarized_text.append(out)
-        
-    for s in summarized_text :
-        summ_t = summ_t + s + " "
-    
-    print(str(summ_t))
-    return str(summ_t)
-
-
-# http://[hostname]/api/summarize?youtube_url=<url>
-def get_vid(url) -> str:
-    query = urlparse(url)
-    if query.hostname == 'youtu.be':
-        return query.path[1:]
-    if query.hostname == 'www.youtube.com':
-        if query.path == '/watch':
-            p = parse_qs(query.query)
-            return p['v'][0]
-    if query.path[:3] == '/v/':
-        return query.path.split('/')[2]
-
-
-# server the app when this file is run
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
